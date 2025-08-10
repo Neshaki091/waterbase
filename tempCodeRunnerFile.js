@@ -1,2 +1,1 @@
-.use('/files', fileRoutes);
-app
+app.use('/files', fileRoutes);
