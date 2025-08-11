@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const { generateAccessToken, generateRefreshToken } = require('../utils/token.util');
 
 // Đăng ký
-const register = async (req, res) => {
+const register = async(req, res) => {
     try {
         const { email, password } = req.body;
 
@@ -36,9 +36,9 @@ const register = async (req, res) => {
         });
         // Trả kết quả
         res.status(201).json({
-            accessToken,
+            accessToken, userId: newUser._id,
         });
-        
+
     } catch (err) {
         console.error('Register error:', err);
         res.status(500).json({ message: 'Server error' });
@@ -46,7 +46,7 @@ const register = async (req, res) => {
 };
 
 // Đăng nhập
-const login = async (req, res) => {
+const login = async(req, res) => {
     try {
         const { email, password } = req.body;
 
@@ -72,7 +72,7 @@ const login = async (req, res) => {
         });
         // Trả kết quả
         res.status(201).json({
-            accessToken,
+            accessToken, userId: user._id
         });
 
     } catch (err) {
@@ -82,7 +82,7 @@ const login = async (req, res) => {
 };
 
 // Refresh token
-const refreshToken = async (req, res) => {
+const refreshToken = async(req, res) => {
     const refreshToken = req.cookies.refreshToken;
     if (!refreshToken) {
         return res.status(401).json({ message: 'No refresh token provided' });
@@ -91,15 +91,15 @@ const refreshToken = async (req, res) => {
     if (!user) {
         return res.status(403).json({ message: 'Invalid refresh token' });
     }
-    jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, async (err, decoded) => {
+    jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, async(err, decoded) => {
         if (err) {
             return res.status(403).json({ message: 'Invalid refresh token' });
         }
         const newAccessToken = generateAccessToken(decoded.id);
-        res.status(200).json({ accessToken: newAccessToken });
+        res.status(200).json({ accessToken: newAccessToken, userId: decoded.id });
     });
 };
-const logout = async (req, res) => {
+const logout = async(req, res) => {
     const refreshToken = req.cookies.refreshToken;
     if (refreshToken) {
         await User.findOneAndUpdate({ refreshToken }, { refreshToken: null });
@@ -107,4 +107,4 @@ const logout = async (req, res) => {
     res.clearCookie('refreshToken');
     res.json({ message: 'Logged out' });
 };
-module.exports = { register, login, refreshToken, logout}; 
+module.exports = { register, login, refreshToken, logout };
