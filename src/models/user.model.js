@@ -1,29 +1,19 @@
+// models/userOwner.model.js
 const mongoose = require('mongoose');
 
+const ownerSchema = new mongoose.Schema({
+    email: String,
+    password: String,
+    apps: [
+        {
+            appId: String,
+            name: String,
+            createdAt: { type: Date, default: Date.now }
+        }
+    ],
+    role: { type: String, enum: ['owner'], default: 'owner' },
+    refreshToken: String
+}, { timestamps: true });
 
-const userSchema = new mongoose.Schema({
-    email: {
-        type: String,
-        required: true,
-        unique: true,
-    },
-    password: {
-        type: String,
-        required: true,
-        minlength: 6,
-    },
-    createdAt: {
-        type: Date,
-        default: Date.now,
-    },
-    updatedAt: {
-        type: Date,
-        default: Date.now,
-    },
-    refreshToken: {
-        type: String,
-        default: null,
-    },
-});
+module.exports = mongoose.model('Owner', ownerSchema);
 
-module.exports = mongoose.model('User', userSchema);

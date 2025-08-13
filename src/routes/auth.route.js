@@ -1,14 +1,26 @@
+// src/routes/auth.route.js
 const express = require('express');
-const authController = require('../controllers/auth.controller');
-const router = express.Router();
-const { register, login, refreshToken, logout } = authController;
+const {
+  registerOwner,
+  registerEndUser,
+  ownerLogin,
+  endUserLogin,
+  refreshToken,
+  logout
+} = require('../controllers/auth.controller');
 
-router.post('/register', (req, res) => {
-  console.log('Register endpoint hit');
-  register(req, res); // gọi hàm đúng cách
-});
-router.post('/login', login);
-router.post('/refresh-token', refreshToken);
+const router = express.Router();
+
+// Register
+router.post('/register/owner', registerOwner);
+router.post('/register/user', registerEndUser);
+
+// Login
+router.post('/login/owner', ownerLogin);
+router.post('/login/user', endUserLogin);
+
+// Token & logout
+router.post('/refresh', refreshToken);
 router.post('/logout', logout);
 
 module.exports = router;
