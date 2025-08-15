@@ -8,7 +8,13 @@ const ownerSchema = new mongoose.Schema({
         {
             appId: String,
             name: String,
-            createdAt: { type: Date, default: Date.now }
+            createdAt: { type: Date, default: Date.now },
+            collection: [
+                {
+                    name: String,
+                    createDate: { type: Date, default: Date.now }
+                }
+            ]
         }
     ],
     role: { type: String, enum: ['owner'], default: 'owner' },

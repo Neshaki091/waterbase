@@ -5,7 +5,6 @@ const authMiddleware = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
         // Kiểm tra header Authorization
-        console.log('Auth header:', authHeader);
         // Nếu không có header hoặc không đúng định dạng Bearer token
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return res.status(401).json({ message: 'Authorization header missing or invalid' });
@@ -19,7 +18,6 @@ const authMiddleware = async (req, res, next) => {
         if (!user) {
             return res.status(401).json({ message: 'User not found' });
         }
-
         req.user = user; // lưu user object vào request
         next();
 

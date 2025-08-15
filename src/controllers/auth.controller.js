@@ -33,7 +33,6 @@ const registerOwner = async (req, res) => {
         const refreshToken = generateRefreshToken(newUser._id);
         const accessToken = generateAccessToken(newUser._id);
         newUser.refreshToken = refreshToken;
-
         await newUser.save();
 
         res.cookie('refreshToken', refreshToken, {
@@ -47,7 +46,7 @@ const registerOwner = async (req, res) => {
             accessToken,
             userId: newUser._id,
             role: newUser.role,
-            apps: newUser.apps
+            apps: newUser.apps,
         });
 
     } catch (err) {
@@ -86,7 +85,7 @@ const registerEndUser = async (req, res) => {
         }
 
         // 3. Tạo model EndUser cho tenant (app)
-        const EndUser = getTenantModel(appId, `${appId}_users`, require('../models/endUser.model'));
+        const EndUser = getTenantModel(appId, `_users`, require('../models/endUser.model'));
 
         // 4. Kiểm tra email đã tồn tại chưa
         const existingUser = await EndUser.findOne({ email });
@@ -112,7 +111,7 @@ const registerEndUser = async (req, res) => {
         const accessToken = generateAccessToken(newUser._id);
         newUser.refreshToken = refreshToken;
 
-        newUser.save(); 
+        newUser.save();
 
         res.status(201).json({
             message: 'Đăng ký end-user thành công',
@@ -153,21 +152,42 @@ const endUserLogin = async (req, res) => {
     try {
         const { email, password } = req.body;
         const ownerId = req.headers["x-owner-id"];
-
+        const appId = req.headers["x-app-id"];
         if (!ownerId) {
             return res.status(400).json({ message: 'Missing owner ID' });
         }
+        const ownerModel = require('../models/user.model');
+        const owner = await ownerModel.findById(ownerId)
+        if (!owner) { return res.status(404).json({ message: 'owner is not exist' }) };
 
-        const user = await User.findOne({ email, parentOwnerId: ownerId }).populate('apps');
-        if (!user) {
-            return res.status(400).json({ message: 'Invalid credentials' });
-        }
+        const app = owner.apps.find(a => a._id.toString() === appId);
+        if (!app) { return res.status(404).json({ message: 'App is not exist' }) };
 
-        return handleLogin(user, password, res);
-    } catch (err) {
-        console.error('End user login error:', err);
-        res.status(500).json({ message: 'Server error' });
+        const EndUser = getTenantModel(appId, `_users`, require("../models/endUser.model"));
+
+        const user = await EndUser.findOne({ email });
+        if (!user) { return res.status(400).json({ message: 'Email is not exist' }) };
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) { return res.status(400).json({ message: "Password is not match" }) };
+
+        const refreshToken = generateRefreshToken(user._id);
+        const accessToken = generateAccessToken(user._id);
+
+        user.refreshToken = refreshToken;
+
+        await user.save();
+
+        res.status(200).json({
+            message: 'login complete',
+            user: { email: user.email, role: user.role, },
+            accessToken: accessToken,
+        })
+    } catch (error) {
+        console.log('End user login error: ', error);
+        res.status(500).json({ message: 'server error' });
     }
+
 };
 
 /**
