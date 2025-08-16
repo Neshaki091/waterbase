@@ -1,63 +1,116 @@
-const mongoose = require('mongoose');
+// controllers/document.controller.js
+const mongoose = require("mongoose");
 
+const getDynamicModel = require("../models/document.model");
+
+// 📌 CREATE Document
 const createDocument = async (req, res) => {
   try {
-    const { collection, data, docId } = req.body;
-    const appId = req.headers['x-app-id'];
+    const collectionName = req.headers["x-collection-name"]; // lấy từ frontend
+    const appId = req.headers["x-app-id"];
+    const collectionId = req.headers["collection-id"];
+    const ownerId = req.headers["x-owner-id"];
+    const documentName = req.body.documentName;
+    const data = req.body.data;
 
-    if (!collection || !data) {
-      return res.status(400).json({ message: 'Collection name and data are required' });
+    console.log("create doc for collection:", collectionName);
+
+    if (!collectionName || !documentName) {
+      return res.status(400).json({ message: "collectionName & documentName are required" });
     }
 
-    // Tên collection cho multi-tenant
-    const collectionName = `${appId}_${collection}`;
-    const db = mongoose.connection;
+    const Model = getDynamicModel(collectionName);
 
-    // Nếu muốn đảm bảo tồn tại collection, có thể check trước:
-    const collections = await db.db.listCollections({ name: collectionName }).toArray();
-    if (collections.length === 0) {
-      console.log(`Collection "${collectionName}" chưa tồn tại → sẽ tạo mới khi insert.`);
+    // ✅ Kiểm tra document đã tồn tại chưa
+    const existingDoc = await Model.findById(documentName);
+    if (existingDoc) {
+      return res.status(409).json({ message: "Document with this ID already exists" });
     }
 
-    const Model = db.collection(collectionName);
-
-    // Nếu có docId → set _id, nếu không MongoDB sẽ tự sinh ObjectId
-    if (docId) {
-      data._id = docId;
-    }
-
-    // Thêm metadata giống Firestore
-    data._createdAt = new Date();
-    data._updatedAt = new Date();
-
-    // Thêm document (MongoDB sẽ tự tạo collection nếu chưa có)
-    const result = await Model.insertOne(data);
-
-    return res.status(201).json({
-      message: 'Document created successfully',
-      documentId: result.insertedId
+    // _id chính là documentName (giống Firestore)
+    const newDoc = new Model({
+      _id: documentName,
+      ownerId: ownerId,
+      collectionId: collectionId,
+      appId: appId,
+      data: data
     });
 
+    await newDoc.save();
+
+    res.status(201).json({ message: "Document created", id: documentName });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Failed to create document', error });
+    console.error("Create document error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
-const removeDocument = async (req, res) => {
-    const { documentName } = req.body;
-    if (!documentName) {
-        return res.status(400).json({ message: 'document name is required' });
+
+// 📌 READ Document
+const getDocument = async (req, res) => {
+  try {
+    const { collectionName, documentName } = req.headers;
+
+    if (!collectionName || !documentName) {
+      return res.status(400).json({ message: "collectionName & documentName are required" });
     }
-    try {
-        await mongoose.connection.dropDocument(documentName);
-        res.status(200).json({ message: 'Document removed successfully' });
+
+    const Model = getDynamicModel(collectionName);
+    const doc = await Model.findById(documentName);
+
+    if (!doc) {
+      return res.status(404).json({ message: "Document not found" });
     }
-    catch (error) {
-        console.error('Error removing document:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }   
+
+    res.json(doc);
+  } catch (error) {
+    console.error("Get document error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
 };
+
+// 📌 UPDATE Document
+const updateDocument = async (req, res) => {
+  try {
+    const { collectionName, documentName } = req.headers;
+    const data = req.body;
+
+    if (!collectionName || !documentName) {
+      return res.status(400).json({ message: "collectionName & documentName are required" });
+    }
+
+    const Model = getDynamicModel(collectionName);
+    const updated = await Model.findByIdAndUpdate(documentName, data, { new: true, upsert: true });
+
+    res.json({ message: "Document updated", document: updated });
+  } catch (error) {
+    console.error("Update document error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// 📌 DELETE Document
+const deleteDocument = async (req, res) => {
+  try {
+    const { collectionName, documentName } = req.headers;
+
+    if (!collectionName || !documentName) {
+      return res.status(400).json({ message: "collectionName & documentName are required" });
+    }
+
+    const Model = getDynamicModel(collectionName);
+    await Model.findByIdAndDelete(documentName);
+
+    res.json({ message: "Document deleted" });
+  } catch (error) {
+    console.error("Delete document error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 module.exports = {
-    createDocument, removeDocument,
+  createDocument,
+  getDocument,
+  updateDocument,
+  deleteDocument,
 };
