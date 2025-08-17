@@ -1,13 +1,19 @@
 const mongoose = require('mongoose'); // ✅ đúng
 
-const userSchema = new mongoose.Schema({
-    email: { type: String, required: true, unique: true },
+const endUserSchema = new mongoose.Schema({
+    appId: { type: mongoose.Schema.Types.ObjectId, ref: 'App', required: true }, // liên kết với app
+    email: { type: String },
     password: { type: String, required: true },
-    role: { type: String, default: 'user' }, // role theo app của bạn
-    accountType: { type: String, enum: ['owner', 'end-user'], required: true },
-    ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // end-user sẽ có
-    appId: { type: mongoose.Schema.Types.ObjectId, ref: 'App' }, // end-user sẽ có
-    refreshToken: {type: String}
-}, { timestamps: true });
+    profile: {
+        name: { type: String, },
+        avatar: { type: String },
+        phone: { type: String },
+        birthday: { type: Date },
+        gender: { type: String, enum: ['male', 'female', 'other'] },
+        preferences: { type: Map, of: mongoose.Schema.Types.Mixed }
+    },
+    createDate: { type: Date, default: Date.now },
+    lastLogin: { type: Date, default: Date.now }
+});
 
-module.exports = userSchema;
+module.exports = mongoose.model('endUser', endUserSchema);

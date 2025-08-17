@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const authMiddleware = require('../middlewares/auth.middleware');
+const {authMiddleware, authEndUser} = require('../middlewares/auth.middleware');
 
 
 router.get('/me', authMiddleware, (req, res) => {
@@ -16,5 +16,21 @@ router.get('/profile', authMiddleware, (req, res) => {
         user: { id: _id, email, createdAt, updatedAt }
     });
 });
+// GET profile EndUser
+router.get('/enduser/profile', authEndUser, (req, res) => {
+    const { _id, email, role, createdAt, updatedAt, appId } = req.user;
+    console.log(_id, email, role, createdAt, updatedAt, appId);
+    res.json({
+        user: { 
+            id: _id, 
+            email, 
+            role,
+            appId,
+            createdAt, 
+            updatedAt 
+        }
+    });
+});
+
 
 module.exports = router;

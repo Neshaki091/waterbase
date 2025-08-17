@@ -1,6 +1,6 @@
 const express = require('express');
 const appController = require('../controllers/app.controller');
-const authMiddleware = require('../middlewares/auth.middleware');
+const {authMiddleware} = require('../middlewares/auth.middleware');
 const router = express.Router();
 
 router.post('/createNewOwnerApp', authMiddleware, appController.createApp);

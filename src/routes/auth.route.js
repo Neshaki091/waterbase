@@ -8,17 +8,16 @@ const {
   refreshToken,
   logout
 } = require('../controllers/auth.controller');
-const authMiddleware = require('../middlewares/auth.middleware');
 
 const router = express.Router();
 
 // Register
 router.post('/register/owner', registerOwner);
-router.post('/register/user',authMiddleware, registerEndUser);
+router.post('/register/user', registerEndUser);
 
 // Login
 router.post('/login/owner', ownerLogin);
-router.post('/login/user',authMiddleware, endUserLogin);
+router.post('/login/user', endUserLogin);
 
 // Token & logout
 router.post('/refresh', refreshToken);

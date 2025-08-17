@@ -3,22 +3,32 @@ const mongoose = require('mongoose');
 // Schema cho document trong collection động
 const documentSchema = new mongoose.Schema(
   {
-    _id: { type: String }, // documentName từ frontend
-    ownerId: {type: String, require: true},
+    _id: { type: String, required: true }, // documentName từ frontend
     appId: { type: String, required: true },
-    collectionId: {type: String, require: true},
-    data: { type: Map, of: mongoose.Schema.Types.Mixed } // key-value linh hoạt (có thể là String, Number...)
+    collectionId: { type: String, required: true },
+    data: { type: Map, of: mongoose.Schema.Types.Mixed }, // key-value linh hoạt
   },
-  { timestamps: true }
+  { 
+    timestamps: true,   // tự động thêm createdAt, updatedAt
+    versionKey: false   // bỏ __v
+  }
 );
 
 // Hàm tạo model động theo tên collection
 const getDynamicModel = (collectionName) => {
-  // Tránh lỗi OverwriteModelError khi gọi nhiều lần
-  if (mongoose.models[collectionName]) {
-    return mongoose.models[collectionName];
+  if (!collectionName) {
+    throw new Error("collectionName is required");
   }
-  return mongoose.model(collectionName, documentSchema, collectionName);
+
+  // Chuẩn hóa tên collection để tránh lỗi
+  const normalizedName = collectionName.trim().replace(/\s+/g, "_");
+
+  // Tránh lỗi OverwriteModelError khi gọi nhiều lần
+  if (mongoose.models[normalizedName]) {
+    return mongoose.models[normalizedName];
+  }
+
+  return mongoose.model(normalizedName, documentSchema, normalizedName);
 };
 
 module.exports = getDynamicModel;

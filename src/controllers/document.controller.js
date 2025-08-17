@@ -1,6 +1,6 @@
 // controllers/document.controller.js
-const mongoose = require("mongoose");
 
+const {v4 :uuidv4} = require("uuid")
 const getDynamicModel = require("../models/document.model");
 
 // 📌 CREATE Document
@@ -9,9 +9,12 @@ const createDocument = async (req, res) => {
     const collectionName = req.headers["x-collection-name"]; // lấy từ frontend
     const appId = req.headers["x-app-id"];
     const collectionId = req.headers["collection-id"];
-    const ownerId = req.headers["x-owner-id"];
-    const documentName = req.body.documentName;
+    documentName = req.body.documentName;
     const data = req.body.data;
+
+    if (!documentName) {
+      documentName = uuidv4();
+    }
 
     console.log("create doc for collection:", collectionName);
 
@@ -30,7 +33,6 @@ const createDocument = async (req, res) => {
     // _id chính là documentName (giống Firestore)
     const newDoc = new Model({
       _id: documentName,
-      ownerId: ownerId,
       collectionId: collectionId,
       appId: appId,
       data: data
@@ -44,7 +46,6 @@ const createDocument = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
-
 
 // 📌 READ Document
 const getDocument = async (req, res) => {

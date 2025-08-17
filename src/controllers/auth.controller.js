@@ -1,11 +1,9 @@
 // src/controllers/auth.controller.js
-const getTenantModel = require("../utils/tenant.util")
 const User = require('../models/user.model');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const mongoose = require('mongoose');
 const { generateAccessToken, generateRefreshToken } = require('../utils/token.util');
-
+const EndUser =require("../models/endUser.model")
 /**
  * Đăng ký Owner (Waterbase)
  */
@@ -44,7 +42,7 @@ const registerOwner = async (req, res) => {
         res.status(201).json({
             message: 'Owner registered successfully',
             accessToken,
-            userId: newUser._id,
+            ownerId: newUser._id,
             role: newUser.role,
             apps: newUser.apps,
         });
@@ -55,80 +53,6 @@ const registerOwner = async (req, res) => {
     }
 };
 
-/**
- * Đăng ký End-User (qua owner ID)
- */
-const registerEndUser = async (req, res) => {
-    try {
-        const { email, password, role } = req.body;
-        const appId = req.headers['x-app-id'];
-        const ownerId = req.headers['x-owner-id']; // đặt tên rõ ràng
-        console.log(appId);
-        console.log(ownerId);
-        console.log(role);
-        if (!ownerId || !appId) {
-            return res.status(400).json({ message: 'Thiếu ownerId hoặc appId trong headers' });
-        }
-
-        // 1. Tìm owner từ DB
-        const OwnerModel = require('../models/user.model'); // model của Owner
-        const owner = await OwnerModel.findById(ownerId);
-
-        if (!owner) {
-            return res.status(404).json({ message: 'Owner không tồn tại' });
-        }
-
-        // 2. Kiểm tra app có trong owner hay không
-        const app = owner.apps.find(a => a._id.toString() === appId);
-        if (!app) {
-            return res.status(404).json({ message: 'App không tồn tại trong Owner này' });
-        }
-
-        // 3. Tạo model EndUser cho tenant (app)
-        const EndUser = getTenantModel(appId, `_users`, require('../models/endUser.model'));
-
-        // 4. Kiểm tra email đã tồn tại chưa
-        const existingUser = await EndUser.findOne({ email });
-        if (existingUser) {
-            return res.status(400).json({ message: appId });
-        }
-
-        // 5. Hash password
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        // 6. Tạo EndUser mới
-        const newUser = await EndUser.create({
-            email,
-            password: hashedPassword,
-            role: role,
-            parentOwnerId: ownerId,
-            accountType: 'end-user',
-            appId: appId,
-        });
-
-        // 7. Tạo token
-        const refreshToken = generateRefreshToken(newUser._id);
-        const accessToken = generateAccessToken(newUser._id);
-        newUser.refreshToken = refreshToken;
-
-        newUser.save();
-
-        res.status(201).json({
-            message: 'Đăng ký end-user thành công',
-            user: { email: newUser.email, role: newUser.role },
-            accessToken: accessToken,
-        });
-
-    } catch (error) {
-        console.error('Lỗi register end-user:', error);
-        res.status(500).json({ message: 'Lỗi server', error: error.message });
-    }
-};
-
-
-/**
- * OWNER LOGIN
- */
 const ownerLogin = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -146,53 +70,122 @@ const ownerLogin = async (req, res) => {
 };
 
 /**
- * END-USER LOGIN
+ * Đăng ký End-User (qua appId trực tiếp)
  */
-const endUserLogin = async (req, res) => {
-    try {
-        const { email, password } = req.body;
-        const ownerId = req.headers["x-owner-id"];
-        const appId = req.headers["x-app-id"];
-        if (!ownerId) {
-            return res.status(400).json({ message: 'Missing owner ID' });
-        }
-        const ownerModel = require('../models/user.model');
-        const owner = await ownerModel.findById(ownerId)
-        if (!owner) { return res.status(404).json({ message: 'owner is not exist' }) };
+const registerEndUser = async (req, res) => {
+  try {
+    const { email, password} = req.body;
+    const appId = req.headers["x-app-id"];
 
-        const app = owner.apps.find(a => a._id.toString() === appId);
-        if (!app) { return res.status(404).json({ message: 'App is not exist' }) };
-
-        const EndUser = getTenantModel(appId, `_users`, require("../models/endUser.model"));
-
-        const user = await EndUser.findOne({ email });
-        if (!user) { return res.status(400).json({ message: 'Email is not exist' }) };
-
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) { return res.status(400).json({ message: "Password is not match" }) };
-
-        const refreshToken = generateRefreshToken(user._id);
-        const accessToken = generateAccessToken(user._id);
-
-        user.refreshToken = refreshToken;
-
-        await user.save();
-
-        res.status(200).json({
-            message: 'login complete',
-            user: { email: user.email, role: user.role, },
-            accessToken: accessToken,
-        })
-    } catch (error) {
-        console.log('End user login error: ', error);
-        res.status(500).json({ message: 'server error' });
+    if (!appId || !email || !password) {
+      return res.status(400).json({ message: 'Missing required fields' });
     }
 
+    // kiểm tra email trong app
+    const exist = await EndUser.findOne({ email, appId });
+    if (exist) return res.status(400).json({ message: 'Email đã tồn tại trong app' });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = await EndUser.create({
+      appId,
+      email,
+      password: hashedPassword,
+      createDate: new Date(),
+      lastLogin: new Date()
+    });
+
+    res.status(201).json({
+      message: 'Đăng ký thành công',
+      user: {
+        userId: newUser._id,
+        email: newUser.email,
+        appId: newUser.appId
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
 };
 
+
+
 /**
- * LOGIN LOGIC DÙNG CHUNG
+ * END-USER LOGIN (qua appId trực tiếp)
  */
+const endUserLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const appId = req.headers["x-app-id"];
+
+    if (!appId || !email || !password) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+    const user = await EndUser.findOne({ email, appId });
+    if (!user) return res.status(400).json({ message: "Email không tồn tại trong app" });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ message: "Password không khớp" });
+
+    const refreshToken = generateRefreshToken(user.userId);
+    const accessToken = generateAccessToken(user.userId);
+
+    user.refreshToken = refreshToken;
+    user.lastLogin = new Date();
+    await user.save();
+
+    res.status(200).json({
+      message: "Login thành công",
+      accessToken,
+      refreshToken,
+      user: {
+        userId: user.userId,
+        email: user.email,
+        appId: user.appId
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+const updateEndUser = async (req, res) => {
+  try {
+    const { userId, profile } = req.body;
+    const appId = req.headers["x-app-id"]; // bắt buộc truyền appId
+
+    if (!appId || !userId || !profile) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    // 🔹 Tìm end-user theo userId và appId
+    const user = await EndUser.findOne({ userId, appId });
+    if (!user) {
+      return res.status(404).json({ message: "End-user not found in this app" });
+    }
+
+    // 🔹 Update profile
+    user.profile = { ...user.profile, ...profile };
+    await user.save();
+
+    res.status(200).json({
+      message: "End-user profile updated successfully",
+      user: {
+        userId: user.userId,
+        email: user.email,
+        profile: user.profile,
+        appId: user.appId
+      }
+    });
+  } catch (err) {
+    console.error("Update end-user error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
 async function handleLogin(user, password, res) {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
@@ -270,5 +263,6 @@ module.exports = {
     ownerLogin,
     endUserLogin,
     refreshToken,
-    logout
+    logout,
+    updateEndUser,
 };

@@ -1,154 +1,107 @@
 const mongoose = require('mongoose');
-const getTenantModel = require('../utils/tenant.util');
-const user = require("../models/user.model")
-
-async function createAppCollection({ name }) {
-
-    mongoose.connection.createCollection(`${name}`)
-        .then()
-        .catch((error) => {
-            console.error('Error creating collection:', error);
-        });
-}
-async function removeAppCollection(name) {
-    try {
-        await mongoose.connection.dropCollection(`${name}`);
-    }
-    catch (error) {
-        console.error('Error removing collection:', error);
-    }
-}
+const App = require("../models/app.model");
+const Collection = require("../models/collection.model");
 
 const createCollection = async (req, res) => {
-    const name = req.body.name;
-    const appId = req.headers["x-app-id"];
-    const ownerId = req.headers["x-owner-id"];
+    try {
+        const { name, type } = req.body;
+        const appId = req.headers["x-app-id"];
 
-    console.log('create: ', appId);
-    console.log('create: ', name, 'for user:', req.user._id, 'with role:', req.user.role); // Assuming appId is stored in the user object
+        if (!name || !type) return res.status(400).json({ message: "Name and type are required" });
+        
+        const app = await App.findById(appId);
+        if (!app) return res.status(404).json({ message: "App not found" });
 
-    const ownerModel = require("../models/user.model");
-    const owner = await ownerModel.findById(ownerId);
+        const exist = await Collection.findOne({ appId, collectionName: name });
+        if (exist) return res.status(409).json({ message: "Collection already exists" });
 
-    if (!owner) { return res.status(404).json({ message: "owner is not exist" }) };
+        // Tạo collection vật lý
+        await mongoose.connection.createCollection(`${appId}_${name}`);
 
-    const app = owner.apps.find(a => a._id.toString() === appId);
-    if (!app) { return res.status(400).json({ message: "App is not exist" }) };
+        // Tạo document metadata
+        const newCollection = await Collection.create({ appId, collectionName: name, type });
 
+        // Push ObjectId vào App.collections
+        app.collections.push(newCollection._id);
+        await app.save();
 
-    if (!name) {
-        return res.status(400).json({ message: 'Collection name is required' });
+        res.status(201).json({ message: "Collection created successfully", collection: newCollection });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Internal server error", error: err.message });
     }
-    const haveCollection = app?.collection;
-    if (!haveCollection) {
-        await user.findByIdAndUpdate(req.user._id, {
-            $push: { apps: { collection: { name: `${appId}_${name}` } } }
-        });
-    } else {
-        const isNameExist = haveCollection?.find(a => a.name.toString().split("_")[1] == name);
-        if (isNameExist) {
-            return res.status(407).json({ message: "collection is exist" })
-        };
-        await user.findByIdAndUpdate(
-            req.user._id,
-            { $push: { "apps.$[app].collection": { name: `${appId}_${name}` } } },
-            { arrayFilters: [{ "app._id": appId }] }
-        );
+};
 
-    }
-
-    mongoose.connection.createCollection(`${appId}_${name}`)
-        .then(() =>
-
-            res.status(201).json({ message: 'Collection created successfully' }))
-        .catch((error) => {
-            console.error('Error creating collection:', error);
-            res.status(500).json({ message: 'Internal server error' });
-        });
-}
 const removeCollection = async (req, res) => {
     try {
-        const id = req.body.id; // ID của collection trong apps[].collection
-        const appId = req.headers["x-app-id"];
-        const ownerId = req.headers["x-owner-id"];
+        const { id } = req.body;
+        if (!id) return res.status(400).json({ message: "Collection ID is required" });
 
-        console.log("Remove collection id:", id);
+        const collection = await Collection.findById(id);
+        if (!collection) return res.status(404).json({ message: "Collection not found" });
 
-        if (!id) {
-            return res.status(400).json({ message: 'Collection id is required' });
-        }
-        if (!appId || !ownerId) {
-            return res.status(400).json({ message: 'App ID and Owner ID are required' });
-        }
+        // Xóa collection vật lý
+        await mongoose.connection.dropCollection(`${collection.appId}_${collection.collectionName}`);
 
-        // 🔍 Tìm owner và collection theo appId + id
-        const owner = await user.findOne(
-            { _id: ownerId, "apps._id": appId, "apps.collection._id": id },
-            { "apps.$": 1 }
-        );
+        // Xóa ObjectId khỏi App.collections
+        await App.findByIdAndUpdate(collection.appId, {
+            $pull: { collections: collection._id }
+        });
 
-        if (!owner) {
-            return res.status(404).json({ message: "Owner/App/Collection not found" });
-        }
+        // Xóa metadata
+        await Collection.findByIdAndDelete(id);
 
-        // Lấy tên collection trong Mongo (lúc tạo đã lưu lại)
-        const collectionMeta = owner.apps[0].collection.find(c => c._id.toString() === id);
-        const collectionName = collectionMeta.name; // VD: `${appId}_${baseName}`
+        res.status(200).json({ message: "Collection removed successfully" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Internal server error", error: err.message });
+    }
+};
 
-        // 🔍 Kiểm tra collection có tồn tại vật lý trong Mongo
-        const collections = await mongoose.connection.db.listCollections().toArray();
-        const isExist = collections.some(col => col.name === collectionName);
+const updateCollection = async (req, res) => {
+    try {
+        const { id, name } = req.body;
+        if (!id || !name) return res.status(400).json({ message: "ID and new name are required" });
 
-        if (!isExist) {
-            return res.status(404).json({ message: "This collection does not exist in Mongo" });
-        }
+        const collection = await Collection.findById(id);
+        if (!collection) return res.status(404).json({ message: "Collection not found" });
 
-        // 1️⃣ Xóa collection vật lý trong Mongo
-        await mongoose.connection.dropCollection(collectionName);
+        const app = await App.findById(collection.appId);
+        if (!app) return res.status(404).json({ message: "App not found" });
 
-        // 2️⃣ Xóa reference trong owner.apps[].collection
-        await user.updateOne(
-            { _id: ownerId, "apps._id": appId },
-            { $pull: { "apps.$.collection": { _id: id } } }
-        );
+        // Rename collection vật lý
+        await mongoose.connection.db.collection(`${collection.appId}_${collection.collectionName}`)
+            .rename(`${collection.appId}_${name}`);
 
-        res.status(200).json({ message: 'Collection removed successfully' });
+        // Cập nhật metadata
+        collection.collectionName = name;
+        await collection.save();
 
-    } catch (error) {
-        console.error('Error removing collection:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        res.status(200).json({ message: "Collection updated successfully", collection });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Internal server error", error: err.message });
     }
 };
 
 const fetchCollection = async (req, res) => {
     try {
         const appId = req.headers["x-app-id"];
-        const ownerId = req.headers["x-owner-id"];
+        if (!appId) return res.status(400).json({ message: "App ID is required" });
 
-        if (!ownerId || !appId) {
-            return res.status(400).json({ message: "x-owner-id and x-app-id are required" });
-        }
+        const collections = await Collection.find({ appId });
 
-        const ownerModel = require("../models/user.model");
-        const owner = await ownerModel.findById(ownerId);
-
-        if (!owner) {
-            return res.status(404).json({ message: "Owner does not exist" });
-        }
-
-        const app = owner.apps.find(a => a._id.toString() === appId);
-        if (!app) {
-            return res.status(404).json({ message: "App does not exist" });
-        }
-
-        return res.json(app.collection || []);
+        res.status(200).json(collections);
     } catch (err) {
         console.error(err);
-        return res.status(500).json({ message: "Server error", error: err.message });
+        res.status(500).json({ message: "Internal server error", error: err.message });
     }
 };
 
 module.exports = {
-    createAppCollection,
-    createCollection, removeCollection, removeAppCollection, fetchCollection,
+    createCollection,
+    removeCollection,
+    fetchCollection,
+    updateCollection,
 };
