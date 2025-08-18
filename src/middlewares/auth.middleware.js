@@ -34,13 +34,13 @@ const authMiddleware = async (req, res, next) => {
 const authEndUser = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
-        console.log("AuthEndUser header:", authHeader);
+        
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return res.status(401).json({ message: 'Authorization header missing or invalid' });
         }
 
         const token = authHeader.split(' ')[1];
-        console.log("token", token);
+      
         // Verify token
         const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
         if (!decoded?.id) {
@@ -48,13 +48,15 @@ const authEndUser = async (req, res, next) => {
         }
 
         // Lấy appId từ header để biết tenant collection
-        const appId = req.headers['x-app-id'];
+        const appId = req.headers["x-app-id"];
+
         if (!appId) {
             return res.status(400).json({ message: 'App ID header missing' });
         }
 
         // Lấy model EndUser của tenant
-        const EndUser = getTenantModel(appId, '_users', EndUserModel);
+        const EndUser = getTenantModel(appId, 'users', EndUserModel);
+        
 
         // Tìm user trong tenant DB
         const user = await EndUser.findById(decoded.id);
@@ -65,6 +67,8 @@ const authEndUser = async (req, res, next) => {
         // Lưu user object vào request
         req.user = user;
         req.appId = appId; // nếu cần dùng trong controller
+        console.log(req.user);
+        console.log(req.appId);
         next();
 
     } catch (error) {

@@ -91,7 +91,7 @@ const fetchCollection = async (req, res) => {
         if (!appId) return res.status(400).json({ message: "App ID is required" });
 
         const collections = await Collection.find({ appId });
-
+        console.log(collections.collectionName);
         res.status(200).json(collections);
     } catch (err) {
         console.error(err);

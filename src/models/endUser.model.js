@@ -1,9 +1,10 @@
 const mongoose = require('mongoose'); // ✅ đúng
 
 const endUserSchema = new mongoose.Schema({
-    appId: { type: mongoose.Schema.Types.ObjectId, ref: 'App', required: true }, // liên kết với app
+    appId: { type: mongoose.Schema.Types.ObjectId, ref: 'App',}, // liên kết với app
     email: { type: String },
     password: { type: String, required: true },
+    refreshToken: { type: String },
     profile: {
         name: { type: String, },
         avatar: { type: String },
@@ -16,4 +17,4 @@ const endUserSchema = new mongoose.Schema({
     lastLogin: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('endUser', endUserSchema);
+module.exports = endUserSchema;
