@@ -6,6 +6,7 @@ const getTenantModel = require('../utils/tenant.util'); // <- thêm dòng này
 const authMiddleware = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
+        
         // Kiểm tra header Authorization
         // Nếu không có header hoặc không đúng định dạng Bearer token
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -67,8 +68,6 @@ const authEndUser = async (req, res, next) => {
         // Lưu user object vào request
         req.user = user;
         req.appId = appId; // nếu cần dùng trong controller
-        console.log(req.user);
-        console.log(req.appId);
         next();
 
     } catch (error) {

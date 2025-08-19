@@ -8,7 +8,7 @@ const createCollection = async (req, res) => {
         const appId = req.headers["x-app-id"];
 
         if (!name || !type) return res.status(400).json({ message: "Name and type are required" });
-        
+
         const app = await App.findById(appId);
         if (!app) return res.status(404).json({ message: "App not found" });
 
@@ -58,7 +58,6 @@ const removeCollection = async (req, res) => {
         res.status(500).json({ message: "Internal server error", error: err.message });
     }
 };
-
 const updateCollection = async (req, res) => {
     try {
         const { id, name } = req.body;
@@ -67,12 +66,20 @@ const updateCollection = async (req, res) => {
         const collection = await Collection.findById(id);
         if (!collection) return res.status(404).json({ message: "Collection not found" });
 
-        const app = await App.findById(collection.appId);
-        if (!app) return res.status(404).json({ message: "App not found" });
+        const oldName = `${collection.appId}_${collection.collectionName}`;
+        const newName = `${collection.appId}_${name}`;
+
+        // Check trùng tên
+        const exists = await mongoose.connection.db.listCollections({ name: newName }).next();
+        if (exists) {
+            return res.status(409).json({ message: "Target collection name already exists" });
+        }
 
         // Rename collection vật lý
-        await mongoose.connection.db.collection(`${collection.appId}_${collection.collectionName}`)
-            .rename(`${collection.appId}_${name}`);
+        await mongoose.connection.db.collection(oldName).rename(newName);
+
+        // Xóa model cũ trong cache nếu có
+        delete mongoose.connection.models[oldName];
 
         // Cập nhật metadata
         collection.collectionName = name;
@@ -80,10 +87,11 @@ const updateCollection = async (req, res) => {
 
         res.status(200).json({ message: "Collection updated successfully", collection });
     } catch (err) {
-        console.error(err);
+        console.error("Update collection error:", err);
         res.status(500).json({ message: "Internal server error", error: err.message });
     }
 };
+
 
 const fetchCollection = async (req, res) => {
     try {
@@ -91,7 +99,6 @@ const fetchCollection = async (req, res) => {
         if (!appId) return res.status(400).json({ message: "App ID is required" });
 
         const collections = await Collection.find({ appId });
-        console.log(collections.collectionName);
         res.status(200).json(collections);
     } catch (err) {
         console.error(err);
