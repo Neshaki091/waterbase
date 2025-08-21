@@ -7,17 +7,17 @@ const {
   endUserLogin,
   refreshToken,
   logout
-} = require('../controllers/auth.controller');
+} = require('../controllers/auth/auth.controller');
 
 const router = express.Router();
 
 // Register
 router.post('/register/owner', registerOwner);
-router.post('/register/user', registerEndUser);
+router.post('/register', registerEndUser);
 
 // Login
 router.post('/login/owner', ownerLogin);
-router.post('/login/user', endUserLogin);
+router.post('/login', endUserLogin);
 
 // Token & logout
 router.post('/refresh', refreshToken);

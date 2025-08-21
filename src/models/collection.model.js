@@ -15,6 +15,7 @@ const collectionSchema = new mongoose.Schema({
     enum: ["data", "realtime"], // chỉ cho phép 2 loại
     required: true
   },
+  createBy: String,
   createDate: {
     type: Date,
     default: Date.now

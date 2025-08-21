@@ -1,31 +1,47 @@
-const { createCollection, removeCollection, fetchCollection, updateCollection } = require('../controllers/collection.controller');
-const { createDocument, deleteDocument, getDocument, updateDocument } = require('../controllers/document.controller');
+const {
+    createCollection,
+    removeCollection,
+    fetchCollection,
+    updateCollection,
+} = require('../controllers/database/collection.controller');
+
+const {
+    createDocument,
+    deleteDocument,
+    getDocument,
+    updateDocument,
+} = require('../controllers/database/document.controller');
+
 const { authMiddleware, authEndUser } = require('../middlewares/auth.middleware');
+const rule = require('../middlewares/rule.middleware');
 
 const router = require('express').Router();
-// collections manager routes
-router.post('/create-collection', authMiddleware, createCollection);
-router.delete('/remove-collection', authMiddleware, removeCollection);
-router.post('/update-collection', authMiddleware, updateCollection);
-router.get('/fetch-collection', authMiddleware, fetchCollection);
 
-// documents manager routes
-router.post('/create-document', authMiddleware, createDocument);
-router.delete('/remove-document', authMiddleware, deleteDocument);
-router.post('/update-document', authMiddleware, updateDocument);
-router.post('/set-document', authMiddleware, updateDocument);
-router.get('/fetch-document', authMiddleware, (req, res, next) => {
-    console.log("Owner fetch-collection hit");
-    next();
-}, getDocument);
+/* =====================
+   Owner routes (chỉ owner quản lý collection)
+===================== */
+router.post('/owner/create-collection', authMiddleware, createCollection);
+router.delete('/owner/remove-collection', authMiddleware, removeCollection);
+router.post('/owner/update-collection', authMiddleware, updateCollection);
+router.get('/owner/fetch-collection', authMiddleware, fetchCollection);
 
-//
-router.get('/enduser/fetch-collection', authEndUser, fetchCollection);
+// Owner thao tác document -> BỎ rule vì owner có toàn quyền
+router.post('/owner/create-document', authMiddleware, createDocument);
+router.delete('/owner/remove-document', authMiddleware, deleteDocument);
+router.post('/owner/update-document', authMiddleware, updateDocument);
+router.get('/owner/fetch-document', authMiddleware, getDocument);
 
-router.post('/enduser/create-document', authEndUser, createDocument);
-router.delete('/enduser/remove-document', authEndUser, deleteDocument);
-router.post('/enduser/update-document', authEndUser, updateDocument);
-router.get('/enduser/fetch-document', authEndUser, getDocument);
-
+/* =====================
+   EndUser routes (bị check rule)
+===================== */
+router.post('/owner/create-collection', authEndUser, rule, createCollection);
+router.delete('/owner/remove-collection', authEndUser, rule, removeCollection);
+router.post('/owner/update-collection', authEndUser, rule, updateCollection);
+router.get('/owner/fetch-collection', authEndUser, rule, fetchCollection);
+// EndUser thao tác document -> PHẢI QUA rule middleware
+router.post('/create-document', authEndUser, rule, createDocument);
+router.delete('/remove-document', authEndUser, rule, deleteDocument);
+router.post('/update-document', authEndUser, rule, updateDocument);
+router.get('/fetch-document', authEndUser, rule, getDocument);
 
 module.exports = router;

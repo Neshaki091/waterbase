@@ -1,10 +1,10 @@
 // src/controllers/auth.controller.js
-const User = require('../models/user.model');
+const User = require('../../models/user.model');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { generateAccessToken, generateRefreshToken } = require('../utils/token.util');
-const EndUserModel =require("../models/endUser.model")
-const getTenantModel = require("../utils/tenant.util")
+const { generateAccessToken, generateRefreshToken } = require('../../utils/token.util');
+const EndUserModel =require("../../models/endUser.model")
+const getTenantModel = require("../../utils/tenant.util")
 /**
  * Đăng ký Owner (Waterbase)
  */

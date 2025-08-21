@@ -1,5 +1,5 @@
-const App = require("../models/app.model");
-const Owner = require("../models/user.model");
+const App = require("../../models/app.model");
+const Owner = require("../../models/user.model");
 
 /**
  * Tạo App mới (Owner)
